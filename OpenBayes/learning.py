@@ -36,16 +36,10 @@ import distributions
 import readexcel
 from inference import ConnexeInferenceJTree, JoinTree
 
-
-# show INFO messages
-#logging.basicConfig(level= logging.INFO)
-#uncomment the following to remove all messages
-logging.basicConfig(level = logging.NOTSET)
-
-
 class LearnEngine:
 
     BNet = None
+    log = logging.getLogger('BNet')
 
     def __init__(self, BNet):
         self.BNet = BNet #.copy()#Xue

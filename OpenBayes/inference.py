@@ -17,11 +17,6 @@ import distributions
 from potentials import DiscretePotential
 from table import Table
 
-# show INFO messages
-#logging.basicConfig(level= logging.INFO)
-#uncomment the following to remove all messages
-logging.basicConfig(level = logging.NOTSET)
-
 
 class InferenceEngine:
     """ General Inference Engine class
@@ -30,6 +25,7 @@ class InferenceEngine:
     """
     BNet = None         # The underlying bayesian network
     evidence = dict()   # the evidence for the BNet
+    log = logging.getLogger('BNet')
 
     def __init__(self, BNet):
         self.BNet = BNet
@@ -37,7 +33,7 @@ class InferenceEngine:
 
     def SetObs(self, ev = dict()):
         """ Incorporate new evidence """
-        logging.info('Incorporating Observations')
+        self.log.info('Incorporating Observations')
         # evidence = {var.name:observed value}
         self.evidence = dict(ev)
 
@@ -79,6 +75,8 @@ class Cluster(graph.Vertex):
     """
     A Cluster/Clique node for the Join Tree structure
     """
+    log = logging.getLogger('BNet')
+
     def __init__(self, Bvertices):
 
         self.vertices = [v for v in Bvertices]    # list of vertices contained in this cluster
@@ -138,7 +136,7 @@ class Cluster(graph.Vertex):
         ####################################################
         ### This part must be revisioned !!!!!!!!!
         ####################################################
-        logging.debug('Message Pass from '+ str(self)+' to '+str(c))
+        self.log.debug('Message Pass from '+ str(self)+' to '+str(c))
         # c must be connected to self by a sepset
         e = self.connecting_e(c)    # sepset that connects the two clusters
         if not e: raise 'Clusters ' + str(self) + ' and ' + str(c) + ' are not connected'
@@ -228,6 +226,8 @@ class SepSet(graph.UndirEdge):
 #=======================================================================
 
 class MoralGraph(graph.Graph):
+    log = logging.getLogger('BNet')
+
     def ChooseVertex(self):
         """
         Chooses a vertex from the list according to criterion :
@@ -309,7 +309,7 @@ class MoralGraph(graph.Graph):
         the smallest weight
         Implementation in Graph.ChooseVertex()
         """
-        logging.info('Triangulating Tree and extracting Clusters')
+        self.log.info('Triangulating Tree and extracting Clusters')
         # don't touch this graph, create a copy of it
         Gt = copy.deepcopy(self)
         Gt.name = 'Triangulised ' + str(Gt.name)
@@ -322,15 +322,15 @@ class MoralGraph(graph.Graph):
 
         while len(G2.v):
             v = G2.ChooseVertex()
-            #logging.debug('Triangulating: chosen '+str(v))
+            self.log.debug('Triangulating: chosen '+str(v))
             cluster = list(v.adjacent_v)
             cluster.append(v)
 
-            #logging.debug('Cluster: '+str([str(c) for c in cluster]))
+            self.log.debug('Cluster: '+str([str(c) for c in cluster]))
 
             c = Cluster(cluster)
             if c.NotSetSepOf(clusters):
-                #logging.debug('Appending cluster')
+                self.log.debug('Appending cluster')
                 clusters.append(c)
 
             clusterleft = copy.copy(cluster)
@@ -388,7 +388,7 @@ class JoinTree(InferenceEngine, graph.Graph):
     """ Join Tree inference engine"""
     def __init__(self, BNet):
         """Creates an 'Optimal' JoinTree from a BNet """
-        logging.info('Creating JunctionTree engine for ' + str(BNet.name))
+        self.log.info('Creating JunctionTree engine for ' + str(BNet.name))
         InferenceEngine.__init__(self, BNet)
         graph.Graph.__init__(self, 'JT: ' + str(BNet.name))
 
@@ -401,7 +401,7 @@ class JoinTree(InferenceEngine, graph.Graph):
         self.likedict = dict((v.name, l) for v, l in zip(self.BNet.observed,
                                                          self.likelihoods))
 
-        logging.info('Constructing Optimal Tree')
+        self.log.info('Constructing Optimal Tree')
         self.ConstructOptimalJTree()
 
         JoinTree.Initialization(self)
@@ -418,7 +418,7 @@ class JoinTree(InferenceEngine, graph.Graph):
         # Create Clusters for this JoinTree
         for c in clusters: self.add_v(c)
 
-        logging.info('Connecting Clusters Optimally')
+        self.log.info('Connecting Clusters Optimally')
         # Create candidate SepSets
         # one candidate sepset for each pair of clusters
         candsepsets = []
@@ -458,7 +458,7 @@ class JoinTree(InferenceEngine, graph.Graph):
             if len(self.e) == len(clusters) - 1: break
 
     def Initialization(self):
-        logging.info('Initialising Potentials for clusters and SepSets')
+        self.log.info('Initialising Potentials for clusters and SepSets')
         # for each cluster and sepset X, set phiX = 1
         for c in self.v.values():   c.potential.AllOnes()         # PhiX = 1
         for s in self.e.values():   s.potential.AllOnes()
@@ -473,7 +473,7 @@ class JoinTree(InferenceEngine, graph.Graph):
                     v.parentcluster = c
 
                     # in place multiplication!
-                    #logging.debug('JT:initialisation '+c.name+' *= '+v.name)
+                    self.log.debug('JT:initialisation '+c.name+' *= '+v.name)
                     c.potential *= v.distribution   # phiX = phiX*Pr(V|Pa(V)) (special in-place op)
 
                     # stop here for this node otherwise we count it
@@ -490,13 +490,13 @@ class JoinTree(InferenceEngine, graph.Graph):
     def GlobalPropagation(self, start = None):
         if start == None: start = self.v.values()[0]    # first cluster found
 
-        logging.info('Global Propagation, starting at :'+ str(start))
-        logging.info('      Collect Evidence')
+        self.log.info('Global Propagation, starting at :'+ str(start))
+        self.log.info('      Collect Evidence')
 
         self.UnmarkAllClusters()
         start.CollectEvidence()
 
-        logging.info('      Distribute Evidence')
+        self.log.info('      Distribute Evidence')
         self.UnmarkAllClusters()
         start.DistributeEvidence()
 
@@ -559,7 +559,7 @@ class JoinTree(InferenceEngine, graph.Graph):
 
     def SetFinding(self, v):
         ''' v becomes True (v=1), all other observed variables are false '''
-        logging.info('Set finding, '+ str(v))
+        self.log.info('Set finding, '+ str(v))
         temp = dict((vi.name,0) for vi in self.BNet.observed)
         if temp.has_key(v): temp[v] = 1
         else: raise str(v) + ''' is not observable or doesn't exist'''
@@ -573,7 +573,7 @@ class JoinTree(InferenceEngine, graph.Graph):
         """ perform message passing to update netwrok according to evidence """
         # evidence = {var.name:value} ; -1=unobserved
         #print evidence
-        logging.info('Global Update')
+        self.log.info('Global Update')
         self.ObservationEntry(evidence.keys(),evidence.values())
 
         # check if only one Cluster is updated.
@@ -585,7 +585,7 @@ class JoinTree(InferenceEngine, graph.Graph):
         if len(startcluster) == 1:
             # all variables that have changed are in the same cluster
             # perform DistributeEvidence only
-            logging.info('distribute only')
+            self.log.info('distribute only')
             self.UnmarkAllClusters()
             startcluster.pop().DistributeEvidence()
         else:
@@ -593,13 +593,13 @@ class JoinTree(InferenceEngine, graph.Graph):
             self.GlobalPropagation()
 
     def GlobalRetraction(self, evidence ):
-        logging.info('Global Retraction')
+        self.log.info('Global Retraction')
         self.Initialization()
         self.ObservationEntry(evidence.keys(), evidence.values())
         self.GlobalPropagation()
 
     def ObservationEntry(self, v, val):
-        logging.info('Observation Entry')
+        self.log.info('Observation Entry')
         for vv, vval in zip(v, val):
             c = self.clusterdict[vv]     # cluster containing likelihood, same as v
             l = self.likedict[vv]

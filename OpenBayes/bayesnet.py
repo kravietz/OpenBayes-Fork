@@ -31,7 +31,6 @@ import potentials
 import inference
 
 numpy.random.seed()
-#logging.basicConfig(level= logging.INFO)
 
 class BVertex(graph.Vertex):
     def __init__(self, name, discrete=True, nvalues=2, observed=True):
@@ -106,7 +105,7 @@ class BVertex(graph.Vertex):
 
 class BNet(graph.Graph):
     log = logging.getLogger('BNet')
-    log.setLevel(logging.ERROR)
+
     def __init__(self, name=None):
         graph.Graph.__init__(self, name)
 
@@ -140,7 +139,7 @@ class BNet(graph.Graph):
         e._v[1].family.pop(e._v[1].family.index(e._v[0]))
 
     def Moralize(self):
-        logging.info('Moralising Tree')
+        self.log.info('Moralising Tree')
         G = inference.MoralGraph(name='Moralized '+str(self.name))
 
         # for each vertice, create a corresponding vertice
